@@ -5,7 +5,6 @@ import pandas as pd
 import time
 from urllib.parse import urlparse, urljoin
 import logging
-from io import StringIO
 
 # --- Configuration settings ---
 output_file = 'opportunites_maillage.csv'
@@ -129,4 +128,21 @@ if st.button("Lancer l'analyse"):
                 mime="text/csv"
             )
         else:
-            st.write("Aucune
+            st.write("Aucune opportunité de maillage interne trouvée.")
+
+# Documentation displayed at the bottom
+st.write("---")
+st.write("### À propos de cet outil")
+st.write("""
+Cet outil de détection de maillage interne vous aide à identifier les opportunités de création de liens internes
+en analysant les résultats de recherche Google pour des mots-clés spécifiques. Il vérifie si les pages les mieux
+classées sont reliées par des liens internes et si les ancres de texte sont optimisées pour les mots-clés cibles.
+Les actions suggérées incluent l'ajout de liens internes ou l'optimisation des ancres.
+
+**Étapes de fonctionnement :**
+1. Entrez l'URL de votre site et la liste de mots-clés.
+2. L'outil recherche les résultats Google pour chaque mot-clé et trouve les pages les plus pertinentes.
+3. Il analyse les liens existants entre ces pages et recommande des actions d'optimisation.
+
+Pour toute question ou assistance, contactez-moi en visitant le site de [Charles Migaud, Consultant SEO Lille](https://charles-migaud.fr/consultant-seo-lille).
+""")
