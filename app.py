@@ -7,7 +7,7 @@ from urllib.parse import urlparse, urljoin
 import logging
 
 # --- Configuration settings ---
-output_file = 'linking_opportunities.csv'
+output_file = 'opportunites_maillage.csv'
 google_url = "https://www.google.com/search"
 headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
@@ -18,7 +18,7 @@ delay_between_requests = 2  # seconds
 
 # Initialize logging
 logging.basicConfig(
-    filename='linking_debug.log',
+    filename='maillage_debug.log',
     filemode='w',
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
@@ -66,20 +66,20 @@ def check_existing_link(source_url, target_url, keyword):
             if parsed_href.path.lower() == target_path:
                 anchor_text = a_tag.get_text().strip().lower()
                 if anchor_text == keyword_lower:
-                    return (True, 'Yes')
+                    return (True, 'Oui')
                 else:
-                    return (True, 'No')
-        return (False, 'No')
+                    return (True, 'Non')
+        return (False, 'Non')
     except requests.RequestException as e:
         logging.warning(f"HTTP error accessing '{source_url}': {e}")
-        return (False, 'No')
+        return (False, 'Non')
     except Exception as e:
         logging.warning(f"Error parsing '{source_url}': {e}")
-        return (False, 'No')
+        return (False, 'Non')
 
 # Detect linking opportunities by linking all pages to the top 1 result
-def detect_linking_opportunities(keywords, site_url):
-    linking_opportunities = []
+def detect_maillage(keywords, site_url):
+    maillage_opportunities = []
 
     for idx, keyword in enumerate(keywords, start=1):
         logging.info(f"Processing keyword {idx}/{len(keywords)}: '{keyword}'")
@@ -90,59 +90,59 @@ def detect_linking_opportunities(keywords, site_url):
             for link in links[1:]:
                 exists, anchor_optimized = check_existing_link(link, top_link, keyword)
                 if not exists:
-                    linking_opportunities.append([keyword, link, top_link, "Add a link", 'Not Applicable'])
+                    maillage_opportunities.append([keyword, link, top_link, "Ajouter un lien", 'Non Applicable'])
                     logging.info(f"Link opportunity: '{link}' → '{top_link}' for keyword '{keyword}' (Add Link)")
-                elif anchor_optimized == 'No':
-                    linking_opportunities.append([keyword, link, top_link, "Optimize anchor text", 'No'])
+                elif anchor_optimized == 'Non':
+                    maillage_opportunities.append([keyword, link, top_link, "Optimiser l'ancre", 'Non'])
                     logging.info(f"Anchor optimization needed: '{link}' links to '{top_link}' with non-optimized anchor for keyword '{keyword}'")
         else:
             logging.info(f"No links found for keyword '{keyword}'.")
 
         time.sleep(delay_between_requests)
 
-    return linking_opportunities
+    return maillage_opportunities
 
 # Streamlit UI and execution
-st.title("Internal Linking Opportunities Detection Tool")
-st.write("### Please enter the information below to start the analysis.")
+st.title("Outil de Détection d'Opportunités de Maillage Interne")
+st.write("### Veuillez entrer les informations ci-dessous pour lancer l'analyse.")
 
-site_url = st.text_input("Enter the target site URL for the `site:` command")
-keywords_input = st.text_area("Keywords (one per line)")
-if st.button("Start Analysis"):
+site_url = st.text_input("Entrez l'URL du site cible pour la commande `site:`")
+keywords_input = st.text_area("Mots-clés (un par ligne)")
+if st.button("Lancer l'analyse"):
     if not keywords_input or not site_url:
-        st.warning("Please enter a URL and keywords.")
+        st.warning("Veuillez entrer une URL et des mots-clés.")
     else:
         keywords = [line.strip() for line in keywords_input.splitlines() if line.strip()]
-        opportunities = detect_linking_opportunities(keywords, site_url)
+        opportunities = detect_maillage(keywords, site_url)
         
         if opportunities:
-            df = pd.DataFrame(opportunities, columns=["Keyword", "Source Page", "Target Page", "Required Action", "Anchor Optimized"])
+            df = pd.DataFrame(opportunities, columns=["Mot-Clé", "Page Source", "Page Cible", "Action Requise", "Anchor Optimisé"])
             st.dataframe(df)
 
             # Provide download link
             csv = df.to_csv(index=False).encode('utf-8')
             st.download_button(
-                label="Download Results as CSV",
+                label="Télécharger les résultats en CSV",
                 data=csv,
                 file_name=output_file,
                 mime="text/csv"
             )
         else:
-            st.write("No internal linking opportunities found.")
+            st.write("Aucune opportunité de maillage interne trouvée.")
 
 # Documentation displayed at the bottom
 st.write("---")
-st.write("### About This Tool")
+st.write("### À propos de cet outil")
 st.write("""
-This internal linking detection tool helps identify opportunities for creating internal links
-by analyzing Google search results for specific keywords. It checks if the top-ranking pages
-are interlinked and whether the anchor text is optimized for the target keywords.
-Recommended actions include adding internal links or optimizing anchor text.
+Cet outil de détection de maillage interne vous aide à identifier les opportunités de création de liens internes
+en analysant les résultats de recherche Google pour des mots-clés spécifiques. Il vérifie si les pages les mieux
+classées sont reliées par des liens internes et si les ancres de texte sont optimisées pour les mots-clés cibles.
+Les actions suggérées incluent l'ajout de liens internes ou l'optimisation des ancres.
 
-**How It Works:**
-1. Enter your site URL and a list of keywords.
-2. The tool searches Google results for each keyword and finds the most relevant pages.
-3. It analyzes existing links between these pages and suggests optimization actions.
+**Étapes de fonctionnement :**
+1. Entrez l'URL de votre site et la liste de mots-clés.
+2. L'outil recherche les résultats Google pour chaque mot-clé et trouve les pages les plus pertinentes.
+3. Il analyse les liens existants entre ces pages et recommande des actions d'optimisation.
 
-For questions or assistance, contact me by visiting the site of [Charles Migaud, SEO Consultant Lille](https://charles-migaud.fr/consultant-seo-lille).
+Pour toute question ou assistance, contactez-moi en visitant le site de [Charles Migaud, Consultant SEO Lille](https://charles-migaud.fr/consultant-seo-lille).
 """)
