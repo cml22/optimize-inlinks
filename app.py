@@ -97,4 +97,36 @@ def detect_maillage(keywords, site_url):
                     maillage_opportunities.append([keyword, link, top_link, "Optimiser l'ancre", 'Non'])
                     logging.info(f"Anchor optimization needed: '{link}' links to '{top_link}' with non-optimized anchor for keyword '{keyword}'")
         else:
-            logging.info(f"No lin
+            logging.info(f"No links found for keyword '{keyword}'.")
+
+        time.sleep(delay_between_requests)
+
+    return maillage_opportunities
+
+# Streamlit UI and execution
+st.title("Outil de Détection d'Opportunités de Maillage Interne")
+st.write("### Veuillez entrer les informations ci-dessous pour lancer l'analyse.")
+
+site_url = st.text_input("Entrez l'URL du site cible pour la commande `site:`")
+keywords_input = st.text_area("Mots-clés (un par ligne)")
+if st.button("Lancer l'analyse"):
+    if not keywords_input or not site_url:
+        st.warning("Veuillez entrer une URL et des mots-clés.")
+    else:
+        keywords = [line.strip() for line in keywords_input.splitlines() if line.strip()]
+        opportunities = detect_maillage(keywords, site_url)
+        
+        if opportunities:
+            df = pd.DataFrame(opportunities, columns=["Mot-Clé", "Page Source", "Page Cible", "Action Requise", "Anchor Optimisé"])
+            st.dataframe(df)
+
+            # Provide download link
+            csv = df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="Télécharger les résultats en CSV",
+                data=csv,
+                file_name=output_file,
+                mime="text/csv"
+            )
+        else:
+            st.write("Aucune
