@@ -4,22 +4,21 @@ import pandas as pd
 import time
 from urllib.parse import urlparse, urljoin
 import logging
+import os
 
-# --- Configuration settings (edit these as needed) ---
-keyword_file = 'motscles.txt'                     # Path to your keywords file
-site = "webloom.fr"                                # Your website (replace with your site)
-output_file = 'opportunites_maillage.csv'          # Output file for opportunities
-google_base_url = "https://www.google.com"         # Base Google search URL (modify for your locale)
-language = "fr"                                    # Google language parameter (e.g., "fr" for French)
-country = "fr"                                     # Google country parameter (e.g., "fr" for France)
+# --- Configuration settings (à modifier selon vos besoins) ---
+keyword_file = 'motscles.txt'                     # Chemin vers le fichier de mots-clés
+site = "webloom.fr"                               # Votre site (à changer)
+output_file = 'opportunites_maillage.csv'         # Fichier de sortie pour les opportunités
+url = "https://www.google.fr/search"              # URL de recherche Google (à adapter selon le pays)
 headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
                   "AppleWebKit/537.36 (KHTML, like Gecko) " +
                   "Chrome/91.0.4472.124 Safari/537.36"
 }
-delay_between_requests = 2  # seconds
+delay_between_requests = 2  # Délai entre les requêtes en secondes
 
-# Setup logging
+# Configuration de la journalisation
 logging.basicConfig(
     filename='maillage_debug.log',
     filemode='w',
@@ -27,7 +26,7 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-# Load keywords from a text file (one keyword per line)
+# Charger les mots-clés depuis un fichier texte
 def load_keywords(file_path):
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -41,20 +40,14 @@ def load_keywords(file_path):
         logging.error(f"Error loading keywords: {e}")
         raise
 
-# Perform a Google search and retrieve results for a specific keyword
+# Effectuer une recherche Google pour récupérer des résultats pour un mot-clé spécifique
 def google_search(query, site=None, num_results=10):
     try:
         search_query = f'{query} site:{site}' if site else query
-        params = {
-            "q": search_query,
-            "num": num_results,
-            "hl": language,
-            "gl": country
-        }
+        params = {"q": search_query, "num": num_results}
 
-        search_url = f"{google_base_url}/search"
-        response = requests.get(search_url, headers=headers, params=params)
-        response.raise_for_status()  # Check for HTTP errors
+        response = requests.get(url, headers=headers, params=params)
+        response.raise_for_status()
 
         soup = BeautifulSoup(response.text, 'html.parser')
         links = []
@@ -72,7 +65,7 @@ def google_search(query, site=None, num_results=10):
         logging.error(f"Error during Google search for '{query}': {e}")
         return []
 
-# Function to check if a source page links to the target page and if the anchor is optimized
+# Vérifier si une page source contient un lien vers la page cible avec une ancre optimisée
 def check_existing_link(source_url, target_url, keyword):
     try:
         response = requests.get(source_url, headers=headers, timeout=10)
@@ -83,17 +76,15 @@ def check_existing_link(source_url, target_url, keyword):
 
         for a_tag in soup.find_all('a', href=True):
             href = a_tag['href']
-            # Normalize href
             normalized_href = urljoin(source_url, href)
             parsed_href = urlparse(normalized_href)
             if parsed_href.path.lower() == target_path:
-                # Found a link to the target page
                 anchor_text = a_tag.get_text().strip().lower()
                 if anchor_text == keyword_lower:
-                    return (True, 'Oui')  # Link exists and anchor is optimized
+                    return (True, 'Oui')  # Lien existe et l'ancre est optimisée
                 else:
-                    return (True, 'Non')  # Link exists but anchor is not optimized
-        return (False, 'Non')  # Link does not exist
+                    return (True, 'Non')  # Lien existe mais ancre non optimisée
+        return (False, 'Non')  # Lien n'existe pas
     except requests.RequestException as e:
         logging.warning(f"HTTP error accessing '{source_url}': {e}")
         return (False, 'Non')
@@ -101,7 +92,7 @@ def check_existing_link(source_url, target_url, keyword):
         logging.warning(f"Error parsing '{source_url}': {e}")
         return (False, 'Non')
 
-# Detect linking opportunities by linking all pages to the top 1 result
+# Détecter les opportunités de maillage interne
 def detect_maillage(keywords, site):
     maillage_opportunities = []
 
@@ -111,7 +102,7 @@ def detect_maillage(keywords, site):
         links = google_search(keyword, site)
 
         if len(links) > 0:
-            top_link = links[0]  # The top 1 link
+            top_link = links[0]
             for link in links[1:]:
                 exists, anchor_optimized = check_existing_link(link, top_link, keyword)
                 if not exists:
@@ -128,11 +119,11 @@ def detect_maillage(keywords, site):
         else:
             logging.info(f"No links found for keyword '{keyword}'.")
 
-        time.sleep(delay_between_requests)  # Pause to avoid being blocked
+        time.sleep(delay_between_requests)
 
     return maillage_opportunities
 
-# Export results to a CSV file
+# Exporter les résultats vers un fichier CSV
 def export_to_csv(maillage_opportunities, output_file):
     try:
         df = pd.DataFrame(maillage_opportunities, columns=["Mot-Clé", "Page Source", "Page Cible", "Action Requise", "Anchor Optimisé"])
@@ -143,10 +134,14 @@ def export_to_csv(maillage_opportunities, output_file):
         logging.error(f"Error exporting to CSV: {e}")
         raise
 
-# Load keywords and start the process
+# Fonction principale
 def main():
+    # Supprimer le fichier de sortie s'il existe déjà
+    if os.path.exists(output_file):
+        os.remove(output_file)
+
     try:
-        # Load keywords
+        # Charger les mots-clés
         keywords = load_keywords(keyword_file)
 
         if not keywords:
@@ -154,11 +149,11 @@ def main():
             logging.warning(f"No keywords found in '{keyword_file}'. Exiting.")
             return
 
-        # Detect internal linking opportunities
+        # Détecter les opportunités de maillage interne
         maillage_opportunities = detect_maillage(keywords, site)
 
         if maillage_opportunities:
-            # Export results to a CSV file
+            # Exporter les résultats vers un fichier CSV
             export_to_csv(maillage_opportunities, output_file)
         else:
             print("Aucune opportunité de maillage interne trouvée.")
