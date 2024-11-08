@@ -115,12 +115,11 @@ if st.button("Lancer l'analyse"):
         opportunities = detect_maillage(keywords, site_url)
         
         if opportunities:
-            for opp in opportunities:
-                st.write(f"Mot-clé : **{opp[0]}** - Page Source : {opp[1]} - Page Cible : {opp[2]} - "
-                         f"Action Requise : {opp[3]} - Anchor Optimisé : {opp[4]}")
+            # Display results as a table
+            df = pd.DataFrame(opportunities, columns=["Mot-Clé", "Page Source", "Page Cible", "Action Requise", "Anchor Optimisé"])
+            st.dataframe(df)  # Show dataframe in Streamlit
 
             # Provide download link
-            df = pd.DataFrame(opportunities, columns=["Mot-Clé", "Page Source", "Page Cible", "Action Requise", "Anchor Optimisé"])
             csv = df.to_csv(index=False).encode('utf-8')
             st.download_button(
                 label="Télécharger les résultats en CSV",
