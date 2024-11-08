@@ -1,3 +1,44 @@
+"""
+Outil de Détection d'Opportunités de Maillage Interne
+------------------------------------------------------
+
+Auteur : Charles Migaud - Consultant SEO [https://charles-migaud.fr/consultant-seo-lille/]
+
+### Objectif
+Cet outil Streamlit est conçu pour détecter des opportunités de maillage interne sur un site Web spécifique, en s'appuyant sur une liste de mots-clés fournie par l'utilisateur. Il permet d'auditer la structure des liens internes pour chaque mot-clé et suggère des actions d'optimisation du maillage. Les utilisateurs peuvent analyser leurs pages Web pour s'assurer qu'elles sont correctement reliées, en fonction de chaque mot-clé, au sein d'un répertoire spécifique.
+
+### Fonctionnement
+1. **Entrée de l'utilisateur :**
+   - **URL cible (répertoire)** : L'utilisateur spécifie l'URL du répertoire du site à analyser (par exemple, `https://www.exemple.com/fr/services/`).
+   - **Liste de mots-clés** : L'utilisateur fournit une liste de mots-clés à analyser, un mot-clé par ligne.
+
+2. **Recherche Google :** Pour chaque mot-clé, l'outil effectue une recherche Google avec la commande `site:` pour limiter les résultats au répertoire spécifié.
+3. **Analyse des Liens :**
+   - **Page cible (Top 1)** : La première page retournée (Top 1) pour chaque mot-clé est définie comme la "Page Cible" pour ce mot-clé.
+   - **Opportunités de lien** : Pour chaque lien des résultats suivants, l'outil vérifie si ce lien contient déjà un lien vers la "Page Cible" :
+     - **Ajouter un lien** : Si aucun lien n'existe entre la source et la cible, l'outil recommande d'ajouter un lien.
+     - **Optimiser l'ancre** : Si le lien existe mais que l'ancre n'est pas optimisée avec le mot-clé, l'outil recommande d'optimiser l'ancre.
+
+4. **Résultats** : L'outil génère un tableau récapitulatif des opportunités, incluant :
+   - **Mot-Clé** : Le mot-clé associé à l'opportunité de lien.
+   - **Page Source** : La page source potentielle pour le lien interne.
+   - **Page Cible** : La page vers laquelle le lien interne devrait pointer.
+   - **Action Requise** : Une action suggérée, soit "Ajouter un lien" si aucun lien n'existe, soit "Optimiser l'ancre" si le lien existe mais n'est pas optimisé.
+   - **Anchor Optimisé** : Indique si l'ancre actuelle est optimisée ou non avec le mot-clé.
+
+5. **Exportation** : Les utilisateurs peuvent télécharger un fichier CSV contenant toutes les opportunités détectées pour une analyse ou une utilisation ultérieure.
+
+### Utilisation
+1. Exécutez l'application Streamlit.
+2. Entrez l'URL du répertoire à auditer et les mots-clés dans les champs appropriés.
+3. Cliquez sur "Lancer l'analyse" pour lancer le traitement.
+4. Consultez les résultats sous forme de tableau et téléchargez le CSV des opportunités pour suivre les recommandations de maillage interne.
+
+Cet outil est conçu pour faciliter la création d'un maillage interne stratégique et optimiser la structure des liens en fonction des mots-clés ciblés dans le cadre d'une stratégie SEO.
+
+---
+"""
+
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
@@ -39,8 +80,8 @@ def google_search(query, site_url=None, num_results=10):
             a_tag = g.find('a', href=True)
             if a_tag:
                 link = a_tag['href']
-                # Only add link if it belongs to the specified directory
-                if link.startswith(site_url):
+                # Ensure the link is within the specified directory
+                if urlparse(link).path.startswith(urlparse(site_url).path):
                     links.append(link)
         logging.info(f"Google search for '{search_query}' returned {len(links)} links")
         return links
@@ -118,7 +159,7 @@ if st.button("Lancer l'analyse"):
         
         if opportunities:
             df = pd.DataFrame(opportunities, columns=["Mot-Clé", "Page Source", "Page Cible", "Action Requise", "Anchor Optimisé"])
-            st.write(df)
+            st.dataframe(df)
 
             # Provide download link
             csv = df.to_csv(index=False).encode('utf-8')
