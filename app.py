@@ -5,7 +5,6 @@ import pandas as pd
 import time
 from urllib.parse import urlparse, urljoin
 import logging
-from io import StringIO
 
 # --- Configuration settings ---
 google_url = "https://www.google.com/search"  # Google search URL (default is google.com)
@@ -26,7 +25,7 @@ logging.basicConfig(
 
 # Streamlit interface for input
 st.title("Détection d'opportunités de maillage interne")
-site = st.text_input("Entrez l'URL de votre site (ex: https://charles-migaud.fr/consultant-seo-lille/:")
+site = st.text_input("Entrez l'URL de votre site (ex: https://ovhcloud.com/fr/vps/):")
 keywords_input = st.text_area("Entrez vos mots-clés (un par ligne) :")
 keywords = keywords_input.splitlines()
 
@@ -79,25 +78,38 @@ def detect_maillage(keywords, site):
 
     return maillage_opportunities
 
-# Displaying results
+# Displaying results and adding action buttons when the search button is clicked
 if site and keywords_input:
-    maillage_results = detect_maillage(keywords, site)
-    
-    if maillage_results:
-        df = pd.DataFrame(maillage_results, columns=['Mot-clé', 'Lien', 'Top 1 Lien', 'Action', 'État de l’Ancre'])
+    if st.button('Lancer la recherche'):
+        maillage_results = detect_maillage(keywords, site)
         
-        # Show results in a table
-        st.dataframe(df)
+        if maillage_results:
+            df = pd.DataFrame(maillage_results, columns=['Mot-clé', 'Lien', 'Top 1 Lien', 'Action', 'État de l’Ancre'])
+            
+            # Show results in a table
+            st.dataframe(df)
 
-        # Provide download option as CSV
-        csv = df.to_csv(index=False)
-        st.download_button(
-            label="Télécharger les résultats (CSV)",
-            data=csv,
-            file_name="opportunites_maillage.csv",
-            mime="text/csv"
-        )
-    else:
-        st.write("Aucune opportunité de maillage trouvée.")
+            # Add action buttons for each row
+            for index, row in df.iterrows():
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.write(f"Mot-clé: {row['Mot-clé']}")
+                    st.write(f"Lien: {row['Lien']}")
+                    st.write(f"Top 1 Lien: {row['Top 1 Lien']}")
+                with col2:
+                    if st.button(f"Ajouter un lien {row['Lien']}", key=f"add_{index}"):
+                        st.write(f"Action pour le lien: {row['Lien']} - Ajouter un lien vers le top 1")
+                        # You can implement the logic to actually add the link to your system/database here.
+
+            # Provide download option as CSV
+            csv = df.to_csv(index=False)
+            st.download_button(
+                label="Télécharger les résultats (CSV)",
+                data=csv,
+                file_name="opportunites_maillage.csv",
+                mime="text/csv"
+            )
+        else:
+            st.write("Aucune opportunité de maillage trouvée.")
 else:
     st.write("Veuillez entrer une URL de site et des mots-clés.")
