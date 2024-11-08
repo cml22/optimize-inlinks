@@ -39,7 +39,9 @@ def google_search(query, site_url=None, num_results=10):
             a_tag = g.find('a', href=True)
             if a_tag:
                 link = a_tag['href']
-                links.append(link)
+                # Only add link if it belongs to the specified directory
+                if link.startswith(site_url):
+                    links.append(link)
         logging.info(f"Google search for '{search_query}' returned {len(links)} links")
         return links
     except requests.RequestException as e:
@@ -115,12 +117,10 @@ if st.button("Lancer l'analyse"):
         opportunities = detect_maillage(keywords, site_url)
         
         if opportunities:
-            for opp in opportunities:
-                st.write(f"Mot-clé : **{opp[0]}** - Page Source : {opp[1]} - Page Cible : {opp[2]} - "
-                         f"Action Requise : {opp[3]} - Anchor Optimisé : {opp[4]}")
+            df = pd.DataFrame(opportunities, columns=["Mot-Clé", "Page Source", "Page Cible", "Action Requise", "Anchor Optimisé"])
+            st.write(df)
 
             # Provide download link
-            df = pd.DataFrame(opportunities, columns=["Mot-Clé", "Page Source", "Page Cible", "Action Requise", "Anchor Optimisé"])
             csv = df.to_csv(index=False).encode('utf-8')
             st.download_button(
                 label="Télécharger les résultats en CSV",
