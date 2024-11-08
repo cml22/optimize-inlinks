@@ -26,7 +26,7 @@ logging.basicConfig(
 
 # Streamlit interface for input
 st.title("Détection d'opportunités de maillage interne")
-site = st.text_input("Entrez l'URL de votre site (ex: https://ovhcloud.com/fr/vps/):")
+site = st.text_input("Entrez l'URL de votre site (ex: https://charles-migaud.fr/consultant-seo-lille/:")
 keywords_input = st.text_area("Entrez vos mots-clés (un par ligne) :")
 keywords = keywords_input.splitlines()
 
