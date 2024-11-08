@@ -1,8 +1,16 @@
-"""
-Outil de Détection d'Opportunités de Maillage Interne
-------------------------------------------------------
+import streamlit as st
+import requests
+from bs4 import BeautifulSoup
+import pandas as pd
+import time
+from urllib.parse import urlparse, urljoin
+import logging
+from io import StringIO
 
-Auteur : Charles Migaud - Consultant SEO [https://charles-migaud.fr/consultant-seo-lille/]
+# --- Documentation en Frontend ---
+st.title("Outil de Détection d'Opportunités de Maillage Interne")
+st.markdown("""
+**Auteur** : Charles Migaud - Consultant SEO [https://charles-migaud.fr/consultant-seo-lille/]
 
 ### Objectif
 Cet outil Streamlit est conçu pour détecter des opportunités de maillage interne sur un site Web spécifique, en s'appuyant sur une liste de mots-clés fournie par l'utilisateur. Il permet d'auditer la structure des liens internes pour chaque mot-clé et suggère des actions d'optimisation du maillage. Les utilisateurs peuvent analyser leurs pages Web pour s'assurer qu'elles sont correctement reliées, en fonction de chaque mot-clé, au sein d'un répertoire spécifique.
@@ -27,26 +35,7 @@ Cet outil Streamlit est conçu pour détecter des opportunités de maillage inte
    - **Anchor Optimisé** : Indique si l'ancre actuelle est optimisée ou non avec le mot-clé.
 
 5. **Exportation** : Les utilisateurs peuvent télécharger un fichier CSV contenant toutes les opportunités détectées pour une analyse ou une utilisation ultérieure.
-
-### Utilisation
-1. Exécutez l'application Streamlit.
-2. Entrez l'URL du répertoire à auditer et les mots-clés dans les champs appropriés.
-3. Cliquez sur "Lancer l'analyse" pour lancer le traitement.
-4. Consultez les résultats sous forme de tableau et téléchargez le CSV des opportunités pour suivre les recommandations de maillage interne.
-
-Cet outil est conçu pour faciliter la création d'un maillage interne stratégique et optimiser la structure des liens en fonction des mots-clés ciblés dans le cadre d'une stratégie SEO.
-
----
-"""
-
-import streamlit as st
-import requests
-from bs4 import BeautifulSoup
-import pandas as pd
-import time
-from urllib.parse import urlparse, urljoin
-import logging
-from io import StringIO
+""")
 
 # --- Configuration settings ---
 output_file = 'opportunites_maillage.csv'
@@ -145,8 +134,7 @@ def detect_maillage(keywords, site_url):
     return maillage_opportunities
 
 # Streamlit UI and execution
-st.title("Outil de détection d'opportunités de maillage")
-st.write("Entrez les mots-clés (un par ligne) et l'URL spécifique à auditer pour les opportunités de maillage.")
+st.write("### Veuillez entrer les informations ci-dessous pour lancer l'analyse.")
 
 site_url = st.text_input("Entrez l'URL du site cible pour la commande `site:`")
 keywords_input = st.text_area("Mots-clés (un par ligne)")
