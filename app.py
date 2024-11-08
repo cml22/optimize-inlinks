@@ -1,14 +1,13 @@
+import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
 import time
 from urllib.parse import urlparse, urljoin
 import logging
-import os
 
-# --- Configuration settings (à modifier selon vos besoins) ---
-keyword_file = 'motscles.txt'                     # Chemin vers le fichier de mots-clés
-site = "webloom.fr"                               # Votre site (à changer)
+# --- Configuration settings ---
+site = "webloom.fr"                               # Site à analyser (à adapter selon vos besoins)
 output_file = 'opportunites_maillage.csv'         # Fichier de sortie pour les opportunités
 url = "https://www.google.fr/search"              # URL de recherche Google (à adapter selon le pays)
 headers = {
@@ -26,21 +25,7 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-# Charger les mots-clés depuis un fichier texte
-def load_keywords(file_path):
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            keywords = [line.strip() for line in f if line.strip()]
-        logging.info(f"Loaded {len(keywords)} keywords from {file_path}")
-        return keywords
-    except FileNotFoundError:
-        logging.error(f"Keyword file not found: {file_path}")
-        raise
-    except Exception as e:
-        logging.error(f"Error loading keywords: {e}")
-        raise
-
-# Effectuer une recherche Google pour récupérer des résultats pour un mot-clé spécifique
+# Fonction de recherche Google pour un mot-clé spécifique
 def google_search(query, site=None, num_results=10):
     try:
         search_query = f'{query} site:{site}' if site else query
@@ -97,7 +82,7 @@ def detect_maillage(keywords, site):
     maillage_opportunities = []
 
     for idx, keyword in enumerate(keywords, start=1):
-        print(f"[{idx}/{len(keywords)}] Recherche pour le mot-clé : {keyword}")
+        st.write(f"[{idx}/{len(keywords)}] Recherche pour le mot-clé : {keyword}")
         logging.info(f"Processing keyword {idx}/{len(keywords)}: '{keyword}'")
         links = google_search(keyword, site)
 
@@ -128,39 +113,42 @@ def export_to_csv(maillage_opportunities, output_file):
     try:
         df = pd.DataFrame(maillage_opportunities, columns=["Mot-Clé", "Page Source", "Page Cible", "Action Requise", "Anchor Optimisé"])
         df.to_csv(output_file, index=False, encoding='utf-8-sig')
-        print(f"Opportunités de maillage interne exportées dans : {output_file}")
         logging.info(f"Exported {len(maillage_opportunities)} opportunities to '{output_file}'")
+        return output_file
     except Exception as e:
         logging.error(f"Error exporting to CSV: {e}")
         raise
 
-# Fonction principale
+# Interface principale Streamlit
 def main():
-    # Supprimer le fichier de sortie s'il existe déjà
-    if os.path.exists(output_file):
-        os.remove(output_file)
+    st.title("Outil de Détection d'Opportunités de Maillage Interne")
+    st.write("Entrez vos mots-clés (un par ligne) :")
 
-    try:
-        # Charger les mots-clés
-        keywords = load_keywords(keyword_file)
+    # Zone de texte pour saisir les mots-clés
+    keywords_input = st.text_area("Mots-clés", placeholder="Mots-clés, un par ligne...")
+    
+    if st.button("Lancer l'analyse"):
+        if keywords_input.strip():
+            keywords = [line.strip() for line in keywords_input.split('\n') if line.strip()]
+            if not keywords:
+                st.warning("Veuillez entrer au moins un mot-clé.")
+            else:
+                st.write("Détection des opportunités de maillage en cours...")
+                maillage_opportunities = detect_maillage(keywords, site)
 
-        if not keywords:
-            print(f"Aucun mot-clé trouvé dans {keyword_file}.")
-            logging.warning(f"No keywords found in '{keyword_file}'. Exiting.")
-            return
-
-        # Détecter les opportunités de maillage interne
-        maillage_opportunities = detect_maillage(keywords, site)
-
-        if maillage_opportunities:
-            # Exporter les résultats vers un fichier CSV
-            export_to_csv(maillage_opportunities, output_file)
+                if maillage_opportunities:
+                    output_path = export_to_csv(maillage_opportunities, output_file)
+                    st.success(f"Opportunités de maillage exportées dans : {output_path}")
+                    st.download_button(
+                        label="Télécharger les résultats",
+                        data=open(output_path, 'rb').read(),
+                        file_name="opportunites_maillage.csv",
+                        mime="text/csv"
+                    )
+                else:
+                    st.info("Aucune opportunité de maillage interne trouvée.")
         else:
-            print("Aucune opportunité de maillage interne trouvée.")
-            logging.info("No linking opportunities found.")
-    except Exception as e:
-        print(f"Une erreur est survenue : {e}")
-        logging.critical(f"Critical error in main: {e}")
+            st.warning("Veuillez entrer des mots-clés dans la zone de texte.")
 
 if __name__ == "__main__":
     main()
