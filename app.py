@@ -5,9 +5,11 @@ import pandas as pd
 import time
 from urllib.parse import urlparse, urljoin
 import logging
+from io import StringIO
 
 # --- Configuration settings ---
-google_url = "https://www.google.com/search"  # Google search URL (default is google.com)
+output_file = 'opportunites_maillage.csv'
+google_url = "https://www.google.com/search"
 headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
                   "AppleWebKit/537.36 (KHTML, like Gecko) " +
@@ -15,7 +17,7 @@ headers = {
 }
 delay_between_requests = 2  # seconds
 
-# Setup logging
+# Initialize logging
 logging.basicConfig(
     filename='maillage_debug.log',
     filemode='w',
@@ -23,93 +25,108 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-# Streamlit interface for input
-st.title("Détection d'opportunités de maillage interne")
-site = st.text_input("Entrez l'URL de votre site (ex: https://ovhcloud.com/fr/vps/):")
-keywords_input = st.text_area("Entrez vos mots-clés (un par ligne) :")
-keywords = keywords_input.splitlines()
-
-# Function to perform Google search
-def google_search(query, site):
-    params = {
-        'q': f"site:{site} {query}",
-        'hl': 'fr',  # French results (default)
-    }
+# Function to perform a Google search and retrieve results for a specific keyword
+def google_search(query, site_url=None, num_results=10):
     try:
+        search_query = f'{query} site:{site_url}' if site_url else query
+        params = {"q": search_query, "num": num_results}
         response = requests.get(google_url, headers=headers, params=params)
+        response.raise_for_status()  # Check for HTTP errors
+
         soup = BeautifulSoup(response.text, 'html.parser')
         links = []
-        for a_tag in soup.find_all('a', href=True):
-            link = a_tag['href']
-            if link.startswith('/url?q='):
-                full_url = link[7:].split('&')[0]  # Extract full URL from Google's result
-                if site in full_url:  # Ensure the link is from the same domain
-                    links.append(full_url)
+        for g in soup.find_all('div', class_='tF2Cxc'):
+            a_tag = g.find('a', href=True)
+            if a_tag:
+                link = a_tag['href']
+                links.append(link)
+        logging.info(f"Google search for '{search_query}' returned {len(links)} links")
         return links
+    except requests.RequestException as e:
+        logging.error(f"HTTP error during Google search for '{query}': {e}")
+        return []
     except Exception as e:
-        logging.error(f"Erreur lors de la recherche Google: {e}")
+        logging.error(f"Error during Google search for '{query}': {e}")
         return []
 
-# Function to detect link opportunities
-def detect_maillage(keywords, site):
+# Function to check if a source page links to the target page and if the anchor is optimized
+def check_existing_link(source_url, target_url, keyword):
+    try:
+        response = requests.get(source_url, headers=headers, timeout=10)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'html.parser')
+        target_path = urlparse(target_url).path.lower()
+        keyword_lower = keyword.lower()
+
+        for a_tag in soup.find_all('a', href=True):
+            href = a_tag['href']
+            normalized_href = urljoin(source_url, href)
+            parsed_href = urlparse(normalized_href)
+            if parsed_href.path.lower() == target_path:
+                anchor_text = a_tag.get_text().strip().lower()
+                if anchor_text == keyword_lower:
+                    return (True, 'Oui')
+                else:
+                    return (True, 'Non')
+        return (False, 'Non')
+    except requests.RequestException as e:
+        logging.warning(f"HTTP error accessing '{source_url}': {e}")
+        return (False, 'Non')
+    except Exception as e:
+        logging.warning(f"Error parsing '{source_url}': {e}")
+        return (False, 'Non')
+
+# Detect linking opportunities by linking all pages to the top 1 result
+def detect_maillage(keywords, site_url):
     maillage_opportunities = []
 
-    # Get base path of the site
-    base_url = urlparse(site)
-    base_path = base_url.path
-
     for idx, keyword in enumerate(keywords, start=1):
-        st.write(f"[{idx}/{len(keywords)}] Recherche pour le mot-clé : {keyword}")
         logging.info(f"Processing keyword {idx}/{len(keywords)}: '{keyword}'")
-        links = google_search(keyword, site)
+        links = google_search(keyword, site_url)
 
-        if len(links) > 0:
-            top_link = links[0]  # The top 1 link
+        if links:
+            top_link = links[0]
             for link in links[1:]:
-                # Filter links based on the base path of the site
-                parsed_link = urlparse(link)
-                if parsed_link.path.startswith(base_path):  # Match the base path
-                    maillage_opportunities.append([keyword, link, top_link, 'Ajouter un lien', 'Non Applicable'])
+                exists, anchor_optimized = check_existing_link(link, top_link, keyword)
+                if not exists:
+                    maillage_opportunities.append([keyword, link, top_link, "Ajouter un lien", 'Non Applicable'])
                     logging.info(f"Link opportunity: '{link}' → '{top_link}' for keyword '{keyword}' (Add Link)")
+                elif anchor_optimized == 'Non':
+                    maillage_opportunities.append([keyword, link, top_link, "Optimiser l'ancre", 'Non'])
+                    logging.info(f"Anchor optimization needed: '{link}' links to '{top_link}' with non-optimized anchor for keyword '{keyword}'")
         else:
-            logging.info(f"Aucun lien trouvé pour le mot-clé '{keyword}'.")
+            logging.info(f"No links found for keyword '{keyword}'.")
 
-        time.sleep(delay_between_requests)  # Pause to avoid being blocked
+        time.sleep(delay_between_requests)
 
     return maillage_opportunities
 
-# Displaying results and adding action buttons when the search button is clicked
-if site and keywords_input:
-    if st.button('Lancer la recherche'):
-        maillage_results = detect_maillage(keywords, site)
+# Streamlit UI and execution
+st.title("Outil de détection d'opportunités de maillage")
+st.write("Entrez les mots-clés (un par ligne) et l'URL spécifique à auditer pour les opportunités de maillage.")
+
+site_url = st.text_input("Entrez l'URL du site cible pour la commande `site:`")
+keywords_input = st.text_area("Mots-clés (un par ligne)")
+if st.button("Lancer l'analyse"):
+    if not keywords_input or not site_url:
+        st.warning("Veuillez entrer une URL et des mots-clés.")
+    else:
+        keywords = [line.strip() for line in keywords_input.splitlines() if line.strip()]
+        opportunities = detect_maillage(keywords, site_url)
         
-        if maillage_results:
-            df = pd.DataFrame(maillage_results, columns=['Mot-clé', 'Lien', 'Top 1 Lien', 'Action', 'État de l’Ancre'])
-            
-            # Show results in a table
-            st.dataframe(df)
+        if opportunities:
+            for opp in opportunities:
+                st.write(f"Mot-clé : **{opp[0]}** - Page Source : {opp[1]} - Page Cible : {opp[2]} - "
+                         f"Action Requise : {opp[3]} - Anchor Optimisé : {opp[4]}")
 
-            # Add action buttons for each row
-            for index, row in df.iterrows():
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.write(f"Mot-clé: {row['Mot-clé']}")
-                    st.write(f"Lien: {row['Lien']}")
-                    st.write(f"Top 1 Lien: {row['Top 1 Lien']}")
-                with col2:
-                    if st.button(f"Ajouter un lien {row['Lien']}", key=f"add_{index}"):
-                        st.write(f"Action pour le lien: {row['Lien']} - Ajouter un lien vers le top 1")
-                        # You can implement the logic to actually add the link to your system/database here.
-
-            # Provide download option as CSV
-            csv = df.to_csv(index=False)
+            # Provide download link
+            df = pd.DataFrame(opportunities, columns=["Mot-Clé", "Page Source", "Page Cible", "Action Requise", "Anchor Optimisé"])
+            csv = df.to_csv(index=False).encode('utf-8')
             st.download_button(
-                label="Télécharger les résultats (CSV)",
+                label="Télécharger les résultats en CSV",
                 data=csv,
-                file_name="opportunites_maillage.csv",
+                file_name=output_file,
                 mime="text/csv"
             )
         else:
-            st.write("Aucune opportunité de maillage trouvée.")
-else:
-    st.write("Veuillez entrer une URL de site et des mots-clés.")
+            st.write("Aucune opportunité de maillage interne trouvée.")
