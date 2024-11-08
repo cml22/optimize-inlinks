@@ -6,10 +6,8 @@ import time
 from urllib.parse import urlparse, urljoin
 import logging
 
-# --- Configuration settings ---
-site = "webloom.fr"                               # Site à analyser (à adapter selon vos besoins)
+# --- Configuration initiale ---
 output_file = 'opportunites_maillage.csv'         # Fichier de sortie pour les opportunités
-url = "https://www.google.fr/search"              # URL de recherche Google (à adapter selon le pays)
 headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
                   "AppleWebKit/537.36 (KHTML, like Gecko) " +
@@ -26,9 +24,10 @@ logging.basicConfig(
 )
 
 # Fonction de recherche Google pour un mot-clé spécifique
-def google_search(query, site=None, num_results=10):
+def google_search(query, site, google_domain, num_results=10):
     try:
         search_query = f'{query} site:{site}' if site else query
+        url = f"https://{google_domain}/search"
         params = {"q": search_query, "num": num_results}
 
         response = requests.get(url, headers=headers, params=params)
@@ -78,13 +77,13 @@ def check_existing_link(source_url, target_url, keyword):
         return (False, 'Non')
 
 # Détecter les opportunités de maillage interne
-def detect_maillage(keywords, site):
+def detect_maillage(keywords, site, google_domain):
     maillage_opportunities = []
 
     for idx, keyword in enumerate(keywords, start=1):
         st.write(f"[{idx}/{len(keywords)}] Recherche pour le mot-clé : {keyword}")
         logging.info(f"Processing keyword {idx}/{len(keywords)}: '{keyword}'")
-        links = google_search(keyword, site)
+        links = google_search(keyword, site, google_domain)
 
         if len(links) > 0:
             top_link = links[0]
@@ -127,6 +126,15 @@ def main():
     # Zone de texte pour saisir les mots-clés
     keywords_input = st.text_area("Mots-clés", placeholder="Mots-clés, un par ligne...")
     
+    # Champ de texte pour entrer l'URL ou le site à analyser
+    site = st.text_input("Site à analyser (ex: charles-migaud.fr)", value="charles-migaud.fr")
+    
+    # Sélection de la langue de recherche
+    language = st.selectbox("Langue de recherche", ["fr", "en", "es", "de"])
+    
+    # Sélection du domaine Google
+    google_domain = st.selectbox("Moteur de recherche", ["google.fr", "google.com", "google.es", "google.de"])
+
     if st.button("Lancer l'analyse"):
         if keywords_input.strip():
             keywords = [line.strip() for line in keywords_input.split('\n') if line.strip()]
@@ -134,7 +142,7 @@ def main():
                 st.warning("Veuillez entrer au moins un mot-clé.")
             else:
                 st.write("Détection des opportunités de maillage en cours...")
-                maillage_opportunities = detect_maillage(keywords, site)
+                maillage_opportunities = detect_maillage(keywords, site, google_domain)
 
                 if maillage_opportunities:
                     output_path = export_to_csv(maillage_opportunities, output_file)
